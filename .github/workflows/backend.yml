@@ -2,8 +2,12 @@ name: CI/CD Pipeline backend
 
 on:
   push:
-    branches:
-      - backend
+    branches: [ "backend" ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ "backend" ]
+  schedule:
+    - cron: '19 5 * * 2'
 
 jobs:
   build:
