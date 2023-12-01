@@ -1,0 +1,81 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - backend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '11'
+
+      - name: Build with Maven
+        run: mvn clean install
+
+  scan-code:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Install dependencies
+        run: npm install -g @sonarqube-scanner/cli
+
+      - name: Analyze code with SonarQube
+        run: sonar-scanner
+
+      - name: Run OWASP Dependency-Check
+        run: |
+          docker run --rm \
+            -v "$(pwd):/usr/src/app" \
+            -e "SCAN_PATH=/usr/src/app" \
+            owasp/dependency-check \
+            --scan /usr/src/app
+
+  build-and-scan-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build Docker image
+        run: docker buildx create --use && docker buildx build --push -t "$DOCKERHUB_USERNAME"/appbackend:latest .
+
+      - name: Scan Docker image with Trivy
+        run: docker run --rm -v "$(pwd):/app" aquasec/trivy "$DOCKERHUB_USERNAME"/appbackend:latest
+
+  push-to-dockerhub:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v1
+
+      - name: Push Docker image to Docker Hub
+        run: echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin && docker push "$DOCKERHUB_USERNAME"/appbackend:latest
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
