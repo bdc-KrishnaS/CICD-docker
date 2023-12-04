@@ -57,6 +57,7 @@ app.post("/api/add-student", async (req, res) => {
         course: "Biology",
         rollNumber: 105,
       },
+      
       {
         name: "Michael Brown",
         college: "Princeton University",
