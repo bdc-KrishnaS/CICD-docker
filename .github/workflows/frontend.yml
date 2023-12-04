@@ -1,37 +1,19 @@
-name: CI/CD Pipeline frontend
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "frontend" ]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ "frontend" ]
-  # schedule:
-  #   - cron: '19 5 * * 2'
+    branches:
+      - frontend
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Set up JDK
-        uses: actions/setup-java@v2
-        with:
-          distribution: 'adopt'
-          java-version: '11'
-
-      - name: Build with Maven
-        run: mvn clean install
-
   scan-code:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: frontend
 
       - name: Set up Node.js
         uses: actions/setup-node@v2
@@ -44,29 +26,32 @@ jobs:
       - name: Analyze code with SonarQube
         run: sonar-scanner
 
-      - name: Run OWASP Dependency-Check
+      - name: Run Trivy on code
         run: |
           docker run --rm \
-            -v "$(pwd):/usr/src/app" \
-            -e "SCAN_PATH=/usr/src/app" \
-            owasp/dependency-check \
-            --scan /usr/src/app
+            -v "$(pwd)/frontend:/app" \
+            aquasec/trivy --exit-code 1 --severity HIGH,MEDIUM,LOW /app
 
-  build-and-scan-image:
+  build-and-test-image:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: frontend
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v1
 
       - name: Build Docker image
-        run: docker buildx create --use && docker buildx build --push -t "$DOCKERHUB_USERNAME"/appfrontend:latest .
+        run: docker buildx create --use && docker buildx build --push -t "$DOCKERHUB_USERNAME"/flaskapp:latest ./frontend
 
-      - name: Scan Docker image with Trivy
-        run: docker run --rm -v "$(pwd):/app" aquasec/trivy "$DOCKERHUB_USERNAME"/appfrontend:latest
+      - name: Run tests on the Docker image
+        run: |
+          docker run --rm \
+            aquasec/trivy --exit-code 1 --severity HIGH,MEDIUM,LOW "$DOCKERHUB_USERNAME"/flaskapp:latest > trivy.txt
+          # Add your additional test commands here
 
   push-to-dockerhub:
     runs-on: ubuntu-latest
@@ -74,12 +59,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          ref: frontend
 
       - name: Set up Docker
         uses: docker/setup-buildx-action@v1
 
       - name: Push Docker image to Docker Hub
-        run: echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin && docker push "$DOCKERHUB_USERNAME"/appfrontend:latest
+        run: echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin && docker push your-dockerhub-username/your-react-app:latest
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
