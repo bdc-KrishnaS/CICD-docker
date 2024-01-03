@@ -2,15 +2,24 @@ FROM node:lts-alpine
 
 WORKDIR /usr/src/app/
 
+USER root
+
 COPY frontend/package*.json ./
 
-# USER node
+# Create a directory for node_modules and change ownership
+RUN mkdir -p node_modules && chown -R node:node node_modules
 
-RUN npm install
+# Install dependencies and cleanup
+RUN npm install && npm cache clean --force
 
 COPY frontend/. .
-# RUN mv /src/index.js /src/index.mjs
-# RUN node /src/index.mjs
 
+# Expose the application port
 EXPOSE 3000
-CMD [ "npm", "start"]
+
+# Health check
+HEALTHCHECK CMD curl --fail http://localhost:3000 || exit 1
+
+USER node
+# Run the application
+CMD ["npm", "start"]
