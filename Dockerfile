@@ -18,7 +18,7 @@ COPY frontend/. .
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK CMD curl --fail http://localhost:3000 || exit 1
+# HEALTHCHECK CMD curl --fail http://localhost:3000 || exit 1
 
 USER node
 # Run the application
